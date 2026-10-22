@@ -1,8 +1,8 @@
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AST Usage Monitor</title>
   <style>
@@ -10,178 +10,390 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: #f2f5f8;
-      color: #193247;
+      background: #f3f6f8;
+      color: #172b3a;
     }
     header {
       background: #173c56;
       color: white;
-      padding: 24px;
+      padding: 22px max(18px, calc((100% - 1100px)/2));
     }
-    header p { color: #d5e4ed; margin-bottom: 0; }
-    main { max-width: 1100px; margin: auto; padding: 24px; }
-    .notice {
-      background: #fff4d9;
-      border: 1px solid #ead49b;
-      border-radius: 10px;
-      padding: 14px;
-      margin-bottom: 20px;
-      line-height: 1.5;
-    }
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 22px;
-    }
+    header h1 { margin: 0 0 6px; }
+    header p { margin: 0; color: #d3e2ed; font-size: 13px; }
+    main { max-width: 1100px; margin: auto; padding: 22px 16px; }
     .card {
       background: white;
-      border: 1px solid #dce5eb;
+      border: 1px solid #dbe4ea;
       border-radius: 12px;
       padding: 20px;
-      min-width: 0;
+      margin-bottom: 16px;
     }
-    .label { color: #647989; font-size: 13px; }
-    .value { font-size: 28px; font-weight: bold; margin-top: 10px; }
-    .toolbar { display: flex; gap: 10px; margin: 18px 0; }
+    h2 { margin-top: 0; font-size: 19px; }
     input, button {
-      padding: 11px;
-      border-radius: 7px;
-      border: 1px solid #cbd7df;
       font: inherit;
+      padding: 11px 12px;
+      border-radius: 7px;
     }
-    input { flex: 1; min-width: 0; }
+    input {
+      width: 100%;
+      border: 1px solid #cbd6de;
+      margin: 5px 0 12px;
+    }
     button {
+      border: 0;
       background: #173c56;
       color: white;
       cursor: pointer;
+      font-weight: bold;
     }
+    button.secondary { background: #e3edf3; color: #173c56; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .muted { color: #617586; font-size: 13px; line-height: 1.5; }
+    #message { white-space: pre-wrap; margin-top: 12px; font-size: 14px; }
+    .error { color: #a12626; }
+    .success { color: #126548; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat { background: #f3f6f8; border-radius: 9px; padding: 15px; }
+    .stat strong { display: block; font-size: 25px; margin-top: 8px; overflow-wrap: anywhere; }
     .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 580px; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
     th, td {
-      padding: 13px 10px;
-      border-bottom: 1px solid #e2e9ee;
       text-align: left;
+      padding: 12px 10px;
+      border-bottom: 1px solid #e2e8ed;
       font-size: 13px;
+      vertical-align: top;
     }
-    th { color: #647989; }
-    .status { font-weight: bold; }
-    footer { padding: 22px 0; color: #647989; font-size: 12px; }
-    @media (max-width: 650px) {
-      main { padding: 14px; }
-      .cards { grid-template-columns: 1fr; }
-      .toolbar { flex-direction: column; }
+    th { color: #617586; font-size: 11px; text-transform: uppercase; }
+    .hidden { display: none !important; }
+    .badge {
+      display: inline-block; border-radius: 20px;
+      padding: 5px 8px; background: #e3edf3; font-size: 11px;
+    }
+    @media (max-width: 600px) {
+      .stats { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>AST Usage Monitor</h1>
-    <p>CASTOR MARINE · SERVICE LINE USAGE</p>
-  </header>
+<header>
+  <h1>AST Usage Monitor</h1>
+  <p>CASTOR MARINE · SERVICE LINE USAGE</p>
+</header>
 
-  <main>
-    <div class="notice">
-      <strong>Preview mode — not connected to Castor.</strong><br>
-      The figures below are illustrative only. Live customer data will
-      be loaded after secure Supabase authentication is configured.
-    </div>
+<main>
+  <section class="card" id="login-card">
+    <h2>Sign in</h2>
+    <p class="muted">Sign in using your authorized AST dashboard account.</p>
+    <form id="login-form">
+      <label for="email">Email address</label>
+      <input id="email" type="email" autocomplete="username"
+        required value="richard.par@ast-networks.com">
+      <label for="password">Password</label>
+      <input id="password" type="password"
+        autocomplete="current-password" required>
+      <button id="login-button" type="submit">Sign in</button>
+    </form>
+    <div id="login-message" role="status" aria-live="polite"></div>
+  </section>
 
-    <section class="cards">
-      <div class="card">
-        <div class="label">Service lines</div>
-        <div class="value" id="total">3</div>
+  <section id="dashboard" class="hidden">
+    <section class="card">
+      <div class="actions">
+        <button id="refresh-button">Refresh Castor data</button>
+        <button id="logout-button" class="secondary">Sign out</button>
       </div>
-      <div class="card">
-        <div class="label">Warning or critical</div>
-        <div class="value" id="alerts">2</div>
-      </div>
-      <div class="card">
-        <div class="label">API connection</div>
-        <div class="value" style="font-size:19px">Not connected</div>
+      <p class="muted" id="connection-status">Waiting for data.</p>
+      <div id="data-message" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div class="stats">
+        <div class="stat">Total service lines<strong id="total">—</strong></div>
+        <div class="stat">Active service lines<strong id="active">—</strong></div>
+        <div class="stat">Last refreshed<strong id="updated" style="font-size:16px">—</strong></div>
       </div>
     </section>
 
     <section class="card">
       <h2>Service lines</h2>
-      <div class="toolbar">
-        <input id="search" type="search"
-          placeholder="Search service name or ID">
-        <button id="reset">Reset search</button>
-      </div>
+      <label for="search">Search by name, nickname or ID</label>
+      <input id="search" type="search" placeholder="Search service lines">
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Service line</th>
               <th>Status</th>
-              <th>Usage</th>
-              <th>Allowance</th>
-              <th>Used</th>
+              <th>Standard GB</th>
+              <th>Priority GB</th>
+              <th>Opt-in priority GB</th>
+              <th>Included GB</th>
+              <th>Usage period</th>
             </tr>
           </thead>
-          <tbody id="rows"></tbody>
+          <tbody id="rows">
+            <tr><td colspan="7">Sign in and refresh to load data.</td></tr>
+          </tbody>
         </table>
       </div>
     </section>
+  </section>
+</main>
 
-    <footer>
-      AST Usage Monitor · Preview only · No customer alerts are sent
-    </footer>
-  </main>
+<script type="module">
+import { createClient } from
+  "https://esm.sh/@supabase/supabase-js@2";
 
-  <script>
-    const samples = [
-      { id: "DEMO-001", name: "Ocean Pioneer",
-        status: "Active", used: 84, allowance: 100 },
-      { id: "DEMO-002", name: "Sea Explorer",
-        status: "Active", used: 465, allowance: 500 },
-      { id: "DEMO-003", name: "Pacific Star",
-        status: "Active", used: 92, allowance: 200 }
+const SUPABASE_URL =
+  "https://dfwkpjzrgsdokmayxnxo.supabase.co";
+
+// Replace this placeholder with your Supabase Publishable key.
+const SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_qprpWNvLde11zcRDi39Vkw_9c1IA9zJ";
+
+const FUNCTION_URL =
+  "https://dfwkpjzrgsdokmayxnxo.supabase.co/functions/v1/castor-usage";
+
+const $ = id => document.getElementById(id);
+let serviceLines = [];
+let supabase;
+
+function message(id, text, type = "") {
+  const el = $(id);
+  el.textContent = text;
+  el.className = type;
+}
+
+function showDashboard(signedIn) {
+  $("login-card").classList.toggle("hidden", signedIn);
+  $("dashboard").classList.toggle("hidden", !signedIn);
+}
+
+function number(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = Number(value);
+  return Number.isFinite(n)
+    ? n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : "—";
+}
+
+function safeDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? String(value)
+    : d.toLocaleDateString();
+}
+
+function latestUsage(line) {
+  const entries = Array.isArray(line.monthlyUsage)
+    ? line.monthlyUsage
+    : [];
+
+  if (!entries.length) return null;
+
+  return [...entries].sort((a, b) =>
+    String(b.startDate || "").localeCompare(String(a.startDate || ""))
+  )[0];
+}
+
+function renderRows() {
+  const q = $("search").value.trim().toLowerCase();
+
+  const filtered = serviceLines.filter(line =>
+    [
+      line.name,
+      line.nickname,
+      line.id
+    ].some(v => String(v ?? "").toLowerCase().includes(q))
+  );
+
+  const tbody = $("rows");
+  tbody.replaceChildren();
+
+  if (!filtered.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.textContent = "No matching service lines.";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  for (const line of filtered) {
+    const usage = latestUsage(line);
+    const tr = document.createElement("tr");
+
+    const values = [
+      `${line.name || "Unnamed service"}${line.nickname ? "\n" + line.nickname : ""}\nID: ${line.id ?? "—"}`,
+      line.status ?? "Unknown",
+      number(usage?.totalStandardGb),
+      number(usage?.totalPriorityGb),
+      number(usage?.totalOptInPriorityGb),
+      number(usage?.includedGb),
+      usage ? `${safeDate(usage.startDate)} – ${safeDate(usage.endDate)}` : "No usage record"
     ];
 
-    function render() {
-      const query = document.getElementById("search")
-        .value.trim().toLowerCase();
-
-      const filtered = samples.filter(s =>
-        (s.name + " " + s.id).toLowerCase().includes(query)
-      );
-
-      document.getElementById("rows").innerHTML = filtered.map(s => {
-        const pct = s.allowance > 0
-          ? s.used / s.allowance * 100 : 0;
-
-        const status = pct >= 100 ? "Limit reached"
-          : pct >= 90 ? "Critical"
-          : pct >= 80 ? "Warning" : "Normal";
-
-        return `<tr>
-          <td>${s.name}<br><small>${s.id}</small></td>
-          <td>${s.status}</td>
-          <td>${s.used} GB</td>
-          <td>${s.allowance} GB</td>
-          <td><span class="status">${Math.round(pct)}% · ${status}</span></td>
-        </tr>`;
-      }).join("");
-
-      document.getElementById("total").textContent = samples.length;
-      document.getElementById("alerts").textContent =
-        samples.filter(s => s.used / s.allowance * 100 >= 80).length;
-
-      if (!filtered.length) {
-        document.getElementById("rows").innerHTML =
-          '<tr><td colspan="5">No matching service lines.</td></tr>';
-      }
-    }
-
-    document.getElementById("search").addEventListener("input", render);
-    document.getElementById("reset").addEventListener("click", () => {
-      document.getElementById("search").value = "";
-      render();
+    values.forEach((value, index) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      if (index === 0) td.style.whiteSpace = "pre-line";
+      tr.appendChild(td);
     });
 
-    render();
-  </script>
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadCastorData() {
+  $("refresh-button").disabled = true;
+  message("data-message", "");
+  $("connection-status").textContent = "Connecting to Castor…";
+
+  try {
+    const { data: { session }, error: sessionError } =
+      await supabase.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    if (!session?.access_token) {
+      showDashboard(false);
+      message("login-message", "Please sign in again.", "error");
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke(
+      "castor-usage",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      }
+    );
+
+    if (error) {
+      // Supabase may wrap non-2xx function responses.
+      let detail = error.message || "Function request failed.";
+      try {
+        const response = error.context;
+        if (response && typeof response.json === "function") {
+          const body = await response.json();
+          if (body?.error) detail = body.error;
+        }
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    if (!data || !Array.isArray(data.serviceLines)) {
+      throw new Error(
+        "Unexpected API response: serviceLines array not found."
+      );
+    }
+
+    serviceLines = data.serviceLines;
+    $("total").textContent = serviceLines.length;
+    $("active").textContent = serviceLines.filter(
+      line => String(line.status || "").toLowerCase() === "active"
+    ).length;
+    $("updated").textContent = new Date().toLocaleTimeString();
+    $("connection-status").textContent =
+      "Connected to Castor through the secured AST function.";
+    message("data-message", "Live service-line data loaded.", "success");
+    renderRows();
+  } catch (error) {
+    console.error("Castor dashboard error:", error);
+    $("connection-status").textContent = "Unable to load Castor data.";
+    message(
+      "data-message",
+      `Request failed: ${error.message || "Unknown error"}. Check the function logs if the problem persists.`,
+      "error"
+    );
+  } finally {
+    $("refresh-button").disabled = false;
+  }
+}
+
+async function init() {
+  if (
+    SUPABASE_PUBLISHABLE_KEY === "YOUR_SUPABASE_PUBLISHABLE_KEY" ||
+    !SUPABASE_PUBLISHABLE_KEY
+  ) {
+    message(
+      "login-message",
+      "Setup incomplete: replace YOUR_SUPABASE_PUBLISHABLE_KEY in index.html before signing in.",
+      "error"
+    );
+    return;
+  }
+
+  supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  $("login-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = $("login-button");
+    button.disabled = true;
+    message("login-message", "Signing in…");
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: $("email").value.trim(),
+        password: $("password").value
+      });
+
+      if (error) throw error;
+
+      $("password").value = "";
+      message("login-message", "");
+      showDashboard(true);
+      await loadCastorData();
+    } catch (error) {
+      message(
+        "login-message",
+        error.message || "Sign-in failed.",
+        "error"
+      );
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("refresh-button").addEventListener("click", loadCastorData);
+
+  $("logout-button").addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    serviceLines = [];
+    $("rows").replaceChildren();
+    showDashboard(false);
+    message("login-message", "You have signed out.", "success");
+  });
+
+  $("search").addEventListener("input", renderRows);
+
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    message("login-message", error.message, "error");
+    return;
+  }
+
+  if (data.session) {
+    showDashboard(true);
+    await loadCastorData();
+  } else {
+    showDashboard(false);
+  }
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT" || !session) {
+      showDashboard(false);
+    }
+  });
+}
+
+init();
+</script>
 </body>
 </html>
