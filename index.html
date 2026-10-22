@@ -1,1 +1,686 @@
 
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AST Networks | Usage Monitor</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { --navy:#101f39; --navy-2:#1b3150; --ocean:#087e8b; --teal:#16a6a1; --page:#eef3f7; --surface:#fff; --ink:#17283e; --muted:#63748a; --line:#d8e2ec; }
+    body { margin:0; font-family:Inter,"Segoe UI",Arial,sans-serif; background:var(--page); color:var(--ink); }
+    header { position:relative; overflow:hidden; color:white; padding:28px max(20px,calc((100% - 1280px)/2)); background:radial-gradient(ellipse at 82% 5%,rgba(32,197,181,.20),transparent 34%),linear-gradient(115deg,#07162c 0%,#123451 54%,#087080 100%); border-bottom:3px solid var(--teal); }
+    header::after { content:""; position:absolute; width:340px; height:340px; right:-95px; top:-190px; border:1px solid rgba(255,255,255,.11); border-radius:50%; box-shadow:0 0 0 28px rgba(255,255,255,.025),0 0 0 58px rgba(255,255,255,.025); pointer-events:none; }
+    .brand-row { display:flex; align-items:center; gap:24px; position:relative; z-index:1; }
+    .brand-logo-plate { display:flex; align-items:center; justify-content:center; flex:none; width:340px; min-height:88px; padding:12px 18px; border-radius:10px; background:#fff; box-shadow:0 5px 18px rgba(0,0,0,.14); }
+    .brand-logo { display:block; width:100%; max-width:100%; max-height:58px; height:auto; object-fit:contain; object-position:center; }
+    .brand-divider { width:1px; height:48px; background:rgba(255,255,255,.28); }
+    .brand-title h1 { margin:0 0 6px; font-size:clamp(22px,3vw,30px); letter-spacing:-.5px; }
+    .brand-title p { margin:0; color:#d2e3ee; font-size:11px; letter-spacing:1.6px; text-transform:uppercase; }
+    .header-chip { margin-left:auto; border:1px solid rgba(255,255,255,.24); background:rgba(255,255,255,.08); border-radius:999px; padding:8px 12px; color:#e3f4f7; font-size:11px; white-space:nowrap; }
+    main { max-width:1240px; margin:auto; padding:24px 18px 42px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:15px; padding:22px; margin-bottom:18px; box-shadow:0 5px 18px rgba(16,31,57,.035); }
+    h2 { margin-top:0; font-size:18px; letter-spacing:-.2px; }
+    input, button {
+      font: inherit;
+      padding: 11px 12px;
+      border-radius: 7px;
+    }
+    input, select { width:100%; border:1px solid #cbd8e4; background:#fbfdff; color:var(--ink); margin:5px 0 12px; outline:none; }
+    input:focus, select:focus { border-color:var(--ocean); box-shadow:0 0 0 3px rgba(8,126,139,.12); }
+    button { border:0; background:linear-gradient(135deg,var(--navy-2),var(--ocean)); color:white; cursor:pointer; font-weight:650; box-shadow:0 3px 8px rgba(16,31,57,.12); transition:transform .15s ease,filter .15s ease; }
+    button:hover { filter:brightness(1.07); transform:translateY(-1px); }
+    button.secondary { background:#e8eff5; color:var(--navy-2); box-shadow:none; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .muted { color:var(--muted); font-size:13px; line-height:1.55; }
+    #message { white-space: pre-wrap; margin-top: 12px; font-size: 14px; }
+    .error { color: #a12626; }
+    .success { color: #126548; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat { background:linear-gradient(145deg,#f7fafc,#edf4f8); border:1px solid #e4edf4; border-radius:12px; padding:17px; position:relative; overflow:hidden; }
+    .stat::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--teal); }
+    .stat strong { color:var(--navy); }
+    .stat strong { display: block; font-size: 25px; margin-top: 8px; overflow-wrap: anywhere; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    th, td {
+      text-align: left;
+      padding: 12px 10px;
+      border-bottom: 1px solid #e2e8ed;
+      font-size: 13px;
+      vertical-align: top;
+    }
+    th { color:#5e7289; font-size:10px; letter-spacing:.65px; text-transform:uppercase; background:#f5f8fb; }
+    tbody tr:hover { background:#f7fbfd; }
+    .hidden { display: none !important; }
+    .chart-grid { display:grid; grid-template-columns:minmax(180px,240px) 1fr; gap:24px; align-items:center; }
+    .pie-chart { width:min(220px,100%); aspect-ratio:1; border-radius:50%; margin:auto; position:relative; background:conic-gradient(#087e8b 0deg 0deg,#dce6ee 0deg 360deg); }
+    .pie-chart::after { content:""; position:absolute; inset:25%; background:white; border-radius:50%; }
+    .pie-center { position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+    .pie-center strong { font-size:25px; line-height:1.1; }
+    .pie-center span { color:#617586; font-size:12px; margin-top:4px; }
+    .chart-legend { display:flex; flex-direction:column; gap:14px; font-size:14px; }
+    .legend-row { display:flex; align-items:flex-start; gap:9px; }
+    .legend-dot { width:11px; height:11px; border-radius:3px; flex:none; margin-top:3px; }
+    .legend-row strong { display:block; margin-bottom:3px; }
+    .notification-grid { display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:12px; }
+    .notification-grid label { display:block; font-size:13px; margin-bottom:5px; }
+    .notification-grid input,.notification-grid select { width:100%; min-width:0; }
+    .notice { padding:11px 12px; background:#fff6df; border:1px solid #ead9a8; border-radius:8px; color:#654c12; font-size:12px; line-height:1.5; }
+    .notification-status { font-size:13px; line-height:1.5; margin-top:10px; }
+    .service-breakdown-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:14px; }
+    .service-breakdown-item { border:1px solid #dce6ee; border-radius:10px; padding:14px; min-width:0; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+    .service-breakdown-item:hover { border-color:var(--ocean); box-shadow:0 5px 18px rgba(8,126,139,.12); }
+    .service-breakdown-item.selected { border:2px solid var(--ocean); background:#f0fbfb; }
+    .detail-toolbar { display:flex; gap:14px; align-items:end; flex-wrap:wrap; }
+    .detail-toolbar > div { flex:1; min-width:240px; }
+    .detail-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:14px 0; }
+    .detail-stat { background:#f2f7fa; border:1px solid #dce7ef; padding:14px; border-radius:10px; }
+    .detail-stat span { display:block; color:var(--muted); font-size:12px; }
+    .detail-stat strong { display:block; margin-top:6px; font-size:18px; overflow-wrap:anywhere; }
+    .history-heading { margin-top:20px; }
+    @media(max-width:760px) { .detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    .service-breakdown-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+    .service-breakdown-head strong { display:block; font-size:14px; }
+    .service-breakdown-pie { width:76px; height:76px; border-radius:50%; position:relative; flex:none; }
+    .service-breakdown-pie::after { content:""; position:absolute; inset:23%; background:white; border-radius:50%; }
+    .service-breakdown-pct { position:absolute; z-index:1; inset:0; display:grid; place-items:center; font-size:12px; font-weight:750; }
+    .service-breakdown-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .service-breakdown-metric { font-size:11px; color:#617586; }
+    .service-breakdown-metric strong { display:block; color:#172b3a; font-size:14px; margin-top:3px; overflow-wrap:anywhere; }
+    @media (max-width:650px) { .chart-grid,.notification-grid,.service-breakdown-grid { grid-template-columns:1fr; } }
+    .badge {
+      display: inline-block; border-radius: 20px;
+      padding: 5px 8px; background: #e3edf3; font-size: 11px;
+    }
+    @media (max-width:760px) {
+      .brand-row { flex-wrap:wrap; gap:14px; }
+      .brand-logo-plate { width:min(280px,82vw); min-height:68px; padding:10px 14px; }
+      .brand-logo { max-height:46px; }
+      .brand-divider { display:none; }
+      .header-chip { margin-left:0; }
+      main { padding:16px 10px 30px; }
+      .card { padding:16px; border-radius:12px; }
+      .table-wrap { margin-left:-4px; margin-right:-4px; }
+    }
+    @media (max-width:600px) { .stats { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand-row">
+    <div class="brand-logo-plate"><img class="brand-logo" src="astlogo.png" alt="AST Networks logo"></div>
+    <span class="brand-divider" aria-hidden="true"></span>
+    <div class="brand-title">
+      <h1>Usage Monitor</h1>
+      <p>AST · Service Line Intelligence</p>
+    </div>
+    <span class="header-chip">MARITIME CONNECTIVITY</span>
+  </div>
+</header>
+
+<main>
+  <section class="card" id="login-card">
+    <h2>Sign in</h2>
+    <p class="muted">Sign in using your authorized AST dashboard account.</p>
+    <form id="login-form">
+      <label for="email">Email address</label>
+      <input id="email" type="email" autocomplete="username"
+        required value="richard.par@ast-networks.com">
+      <label for="password">Password</label>
+      <input id="password" type="password"
+        autocomplete="current-password" required>
+      <button id="login-button" type="submit">Sign in</button>
+    </form>
+    <div id="login-message" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="dashboard" class="hidden">
+    <section class="card">
+      <div class="actions">
+        <button id="refresh-button">Refresh AST data</button>
+        <button id="logout-button" class="secondary">Sign out</button>
+      </div>
+      <p class="muted" id="connection-status">Waiting for data.</p>
+      <div id="data-message" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div class="stats">
+        <div class="stat">Total service lines<strong id="total">—</strong></div>
+        <div class="stat">Active service lines<strong id="active">—</strong></div>
+        <div class="stat">Last refreshed<strong id="updated" style="font-size:16px">—</strong></div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Allowance usage breakdown">
+      <h2>Allowance usage breakdown</h2>
+      <p class="muted">Aggregate across the service lines currently loaded. Usage combines Standard GB and Priority GB; opt-in priority is shown separately in the table and is not added again.</p>
+      <div class="chart-grid">
+        <div class="pie-chart" id="usage-pie" role="img" aria-label="Pie chart showing allowance used and remaining">
+          <div class="pie-center"><strong id="pie-percent">—</strong><span>allowance used</span></div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-row"><span class="legend-dot" style="background:#087e8b"></span><div><strong id="pie-used">— GB used</strong><span class="muted">Standard + priority usage</span></div></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#dce6ee;border:1px solid #bdcbd8"></span><div><strong id="pie-remaining">— GB remaining</strong><span class="muted">Included allowance minus usage, minimum zero</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Service lines</h2>
+      <label for="search">Search by name, nickname or ID</label>
+      <input id="search" type="search" placeholder="Search service lines">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service line</th>
+              <th>Status</th>
+              <th>Standard GB</th>
+              <th>Priority GB</th>
+              <th>Opt-in priority GB</th>
+              <th>Included GB</th>
+              <th>Usage period</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="7">Sign in and refresh to load data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Per-service-line usage breakdown">
+      <h2>Usage breakdown per service line</h2>
+      <p class="muted">Each card shows Standard, Priority and Opt-in Priority separately. Allowance usage is Standard + Priority; Opt-in Priority is displayed separately to avoid double-counting.</p>
+      <div class="detail-toolbar">
+        <div><label for="service-selector">Select a service line to view details</label><select id="service-selector"><option value="">Load data to choose a service line</option></select></div>
+        <button type="button" id="show-service-details" class="secondary">View selected service</button>
+      </div>
+      <div id="selected-service-details"><p class="muted">Select a service line above, or click a service-line card below, to view its usage and monthly history.</p></div>
+      <h3 style="margin:24px 0 4px">All service lines</h3>
+      <div id="service-breakdown" class="service-breakdown-grid">
+        <p class="muted">Sign in and refresh to load service-line usage.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Usage notification settings">
+      <h2>Usage threshold notifications</h2>
+      <p class="muted">Choose a usage threshold and recipient for an alert when a service line reaches that level.</p>
+      <label><input id="notifications-enabled" type="checkbox" style="width:auto;margin-right:7px"> Enable threshold notifications</label>
+      <div class="notification-grid">
+        <div>
+          <label for="notification-email">Recipient email</label>
+          <input id="notification-email" type="email" placeholder="name@company.com" autocomplete="email">
+        </div>
+        <div>
+          <label for="notification-threshold">Notify at</label>
+          <select id="notification-threshold">
+            <option value="50">50%</option><option value="70">70%</option>
+            <option value="80" selected>80%</option><option value="85">85%</option>
+            <option value="90">90%</option><option value="95">95%</option><option value="100">100%</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="save-notification-settings" type="button">Save settings on this browser</button>
+      </div>
+      <div id="notification-status" class="notification-status muted" role="status" aria-live="polite">Notifications are disabled.</div>
+      <div class="notice">Email delivery is not active yet. This page can save the preference in this browser and show threshold matches, but actual email sending requires a server-side Supabase notification function and an email provider. Do not put email-provider API keys in this HTML.</div>
+    </section>
+  </section>
+</main>
+
+<script type="module">
+import { createClient } from
+  "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL =
+  "https://dfwkpjzrgsdokmayxnxo.supabase.co";
+
+// Replace this placeholder with your Supabase Publishable key.
+const SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_qprpWNvLde11zcRDi39Vkw_9c1IA9zJ";
+
+const FUNCTION_URL =
+  "https://dfwkpjzrgsdokmayxnxo.supabase.co/functions/v1/castor-usage";
+
+const $ = id => document.getElementById(id);
+let serviceLines = [];
+let supabase;
+
+function message(id, text, type = "") {
+  const el = $(id);
+  el.textContent = text;
+  el.className = type;
+}
+
+function showDashboard(signedIn) {
+  $("login-card").classList.toggle("hidden", signedIn);
+  $("dashboard").classList.toggle("hidden", !signedIn);
+}
+
+function number(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = Number(value);
+  return Number.isFinite(n)
+    ? n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : "—";
+}
+
+function safeDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? String(value)
+    : d.toLocaleDateString();
+}
+
+function latestUsage(line) {
+  const entries = Array.isArray(line.monthlyUsage)
+    ? line.monthlyUsage
+    : [];
+
+  if (!entries.length) return null;
+
+  return [...entries].sort((a, b) =>
+    String(b.startDate || "").localeCompare(String(a.startDate || ""))
+  )[0];
+}
+
+function latestUsageForAlert(line) {
+  const usage = latestUsage(line);
+  if (!usage) return null;
+  const standard = Number(usage.totalStandardGb) || 0;
+  const priority = Number(usage.totalPriorityGb) || 0;
+  const included = Number(usage.includedGb);
+  if (!Number.isFinite(included) || included <= 0) return null;
+  return { used: Math.max(0, standard + priority), included };
+}
+
+function renderUsagePie() {
+  const totals = serviceLines.reduce((acc, line) => {
+    const item = latestUsageForAlert(line);
+    if (item) {
+      acc.used += item.used;
+      acc.included += item.included;
+    }
+    return acc;
+  }, { used: 0, included: 0 });
+  const remaining = Math.max(0, totals.included - totals.used);
+  const pct = totals.included > 0 ? totals.used / totals.included * 100 : 0;
+  const angle = Math.min(100, pct) * 3.6;
+  $("usage-pie").style.background =
+    `conic-gradient(#087e8b 0deg ${angle}deg,#dce6ee ${angle}deg 360deg)`;
+  $("pie-percent").textContent = totals.included > 0 ? Math.round(pct) + "%" : "—";
+  $("pie-used").textContent = number(totals.used) + " GB used";
+  $("pie-remaining").textContent = number(remaining) + " GB remaining";
+}
+
+function renderServiceBreakdown() {
+  const container = $("service-breakdown");
+  if (!serviceLines.length) {
+    container.innerHTML = '<p class="muted">No service-line data loaded yet.</p>';
+    return;
+  }
+
+  container.innerHTML = serviceLines.map(line => {
+    const usage = latestUsage(line);
+    const standard = Math.max(0, Number(usage?.totalStandardGb) || 0);
+    const priority = Math.max(0, Number(usage?.totalPriorityGb) || 0);
+    const optInPriority = Math.max(0, Number(usage?.totalOptInPriorityGb) || 0);
+    const includedValue = Number(usage?.includedGb);
+    const hasAllowance = Number.isFinite(includedValue) && includedValue > 0;
+    const included = hasAllowance ? includedValue : 0;
+    const used = standard + priority;
+    const remaining = Math.max(0, included - used);
+    const overage = Math.max(0, used - included);
+    const pct = hasAllowance ? used / included * 100 : null;
+    const shownPct = pct === null ? "—" : Math.round(pct) + "%";
+    const angle = pct === null ? 0 : Math.min(100, pct) * 3.6;
+    const pie = pct === null
+      ? "conic-gradient(#dce6ee 0deg 360deg)"
+      : `conic-gradient(#087e8b 0deg ${angle}deg,#dce6ee ${angle}deg 360deg)`;
+    const serviceName = escapeHtml(line.name || "Unnamed service");
+    const nickname = escapeHtml(line.nickname || "");
+    const serviceId = escapeHtml(line.id ?? "—");
+    const period = usage
+      ? `${safeDate(usage.startDate)} – ${safeDate(usage.endDate)}`
+      : "No usage record";
+
+    return `<article class="service-breakdown-item" data-service-id="${escapeHtml(String(line.id ?? line.name ?? ""))}" tabindex="0" role="button" aria-label="View details for ${serviceName}">
+      <div class="service-breakdown-head">
+        <div>
+          <strong>${serviceName}</strong>
+          ${nickname ? `<div class="muted">${nickname}</div>` : ""}
+          <div class="muted">ID: ${serviceId}</div>
+          <div class="muted" style="margin-top:5px">${escapeHtml(period)}</div>
+        </div>
+        <div class="service-breakdown-pie" style="background:${pie}" role="img" aria-label="${serviceName}: ${shownPct} of allowance used">
+          <span class="service-breakdown-pct">${shownPct}</span>
+        </div>
+      </div>
+      <div class="service-breakdown-metrics">
+        <div class="service-breakdown-metric">Standard<strong>${number(usage?.totalStandardGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Priority<strong>${number(usage?.totalPriorityGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Opt-in Priority<strong>${number(usage?.totalOptInPriorityGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Total counted<strong>${number(used)} GB</strong></div>
+        <div class="service-breakdown-metric">Included allowance<strong>${number(usage?.includedGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Remaining<strong>${number(remaining)} GB</strong></div>
+        <div class="service-breakdown-metric">Over allowance<strong>${number(overage)} GB</strong></div>
+      </div>
+    </article>`;
+  }).join("");
+  container.querySelectorAll(".service-breakdown-item").forEach(card => {
+    const choose = () => selectServiceLine(card.dataset.serviceId);
+    card.addEventListener("click", choose);
+    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(); } });
+  });
+  const selector = $("service-selector");
+  const previous = selector.value;
+  selector.innerHTML = '<option value="">Choose a service line…</option>' + serviceLines.map(line => {
+    const id = String(line.id ?? line.name ?? "");
+    const title = [line.name || "Unnamed service", line.nickname].filter(Boolean).join(" — ");
+    return `<option value="${escapeHtml(id)}">${escapeHtml(title)}</option>`;
+  }).join("");
+  if (serviceLines.some(line => String(line.id ?? line.name ?? "") === previous)) selector.value = previous;
+  else if (serviceLines.length) selector.value = String(serviceLines[0].id ?? serviceLines[0].name ?? "");
+  if (selector.value) selectServiceLine(selector.value);
+}
+
+function selectServiceLine(id) {
+  const line = serviceLines.find(item => String(item.id ?? item.name ?? "") === String(id));
+  if (!line) return;
+  const selector = $("service-selector");
+  if (selector.value !== String(id)) selector.value = String(id);
+  document.querySelectorAll(".service-breakdown-item").forEach(card => card.classList.toggle("selected", card.dataset.serviceId === String(id)));
+  const usage = latestUsage(line);
+  const standard = Number(usage?.totalStandardGb) || 0;
+  const priority = Number(usage?.totalPriorityGb) || 0;
+  const optin = Number(usage?.totalOptInPriorityGb) || 0;
+  const allowance = Number(usage?.includedGb) || 0;
+  const total = standard + priority;
+  const remaining = Math.max(0, allowance - total);
+  const overage = Math.max(0, total - allowance);
+  const pct = allowance > 0 ? total / allowance * 100 : null;
+  const history = [...(Array.isArray(line.monthlyUsage) ? line.monthlyUsage : [])].sort((a,b) => String(b.startDate || "").localeCompare(String(a.startDate || "")));
+  const historyRows = history.map(item => `<tr><td>${escapeHtml(safeDate(item.startDate))} – ${escapeHtml(safeDate(item.endDate))}</td><td>${number(item.totalStandardGb)}</td><td>${number(item.totalPriorityGb)}</td><td>${number(item.totalOptInPriorityGb)}</td><td>${number((Number(item.totalStandardGb)||0)+(Number(item.totalPriorityGb)||0))}</td><td>${number(item.includedGb)}</td></tr>`).join("");
+  $("selected-service-details").innerHTML = `<h3 style="margin:20px 0 4px">${escapeHtml(line.name || "Unnamed service")}</h3><p class="muted">${escapeHtml(line.nickname || "")} ${line.id ? "· ID: " + escapeHtml(line.id) : ""} · Status: ${escapeHtml(line.status || "Unknown")}</p><div class="detail-grid"><div class="detail-stat"><span>Standard usage</span><strong>${number(standard)} GB</strong></div><div class="detail-stat"><span>Priority usage</span><strong>${number(priority)} GB</strong></div><div class="detail-stat"><span>Opt-in Priority</span><strong>${number(optin)} GB</strong></div><div class="detail-stat"><span>Total counted</span><strong>${number(total)} GB</strong></div><div class="detail-stat"><span>Included allowance</span><strong>${number(allowance)} GB</strong></div><div class="detail-stat"><span>Remaining</span><strong>${number(remaining)} GB</strong></div><div class="detail-stat"><span>Over allowance</span><strong style="color:${overage > 0 ? "#b42318" : "inherit"}">${number(overage)} GB</strong></div><div class="detail-stat"><span>Allowance used</span><strong style="color:${pct !== null && pct >= 100 ? "#b42318" : "inherit"}">${pct === null ? "—" : number(pct) + "%"}</strong></div></div><h3 class="history-heading">Usage history by period</h3><div class="table-wrap"><table><thead><tr><th>Usage period</th><th>Standard GB</th><th>Priority GB</th><th>Opt-in Priority GB</th><th>Total counted GB</th><th>Included GB</th></tr></thead><tbody>${historyRows || '<tr><td colspan="6">No usage history available.</td></tr>'}</tbody></table></div>`;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function getNotificationSettings() {
+  return {
+    enabled: $("notifications-enabled").checked,
+    email: $("notification-email").value.trim(),
+    threshold: Number($("notification-threshold").value) || 80
+  };
+}
+
+function updateNotificationStatus(saved = false) {
+  const settings = getNotificationSettings();
+  const status = $("notification-status");
+  if (!settings.enabled) {
+    status.textContent = saved
+      ? "Settings saved in this browser. Notifications are currently disabled."
+      : "Notifications are disabled.";
+    return;
+  }
+  if (!settings.email || !$("notification-email").checkValidity()) {
+    status.textContent = "Enter a valid recipient email address. No email has been sent.";
+    return;
+  }
+  const reached = serviceLines.filter(line => {
+    const item = latestUsageForAlert(line);
+    return item && item.used / item.included * 100 >= settings.threshold;
+  });
+  status.textContent = `Preview: ${reached.length} service line(s) are at or above ${settings.threshold}%. Recipient: ${settings.email}. ${saved ? "Settings saved in this browser. " : ""}No email has been sent; server-side delivery still needs to be configured.`;
+}
+
+function loadNotificationSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("astUsageNotificationSettings") || "null");
+    if (!saved) return;
+    $("notifications-enabled").checked = Boolean(saved.enabled);
+    $("notification-email").value = saved.email || "";
+    $("notification-threshold").value = String(saved.threshold || 80);
+  } catch (_) {
+    // Ignore malformed browser-local settings.
+  }
+}
+
+function renderRows() {
+  const q = $("search").value.trim().toLowerCase();
+
+  const filtered = serviceLines.filter(line =>
+    [
+      line.name,
+      line.nickname,
+      line.id
+    ].some(v => String(v ?? "").toLowerCase().includes(q))
+  );
+
+  const tbody = $("rows");
+  tbody.replaceChildren();
+
+  if (!filtered.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.textContent = "No matching service lines.";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  for (const line of filtered) {
+    const usage = latestUsage(line);
+    const tr = document.createElement("tr");
+
+    const values = [
+      `${line.name || "Unnamed service"}${line.nickname ? "\n" + line.nickname : ""}\nID: ${line.id ?? "—"}`,
+      line.status ?? "Unknown",
+      number(usage?.totalStandardGb),
+      number(usage?.totalPriorityGb),
+      number(usage?.totalOptInPriorityGb),
+      number(usage?.includedGb),
+      usage ? `${safeDate(usage.startDate)} – ${safeDate(usage.endDate)}` : "No usage record"
+    ];
+
+    values.forEach((value, index) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      if (index === 0) td.style.whiteSpace = "pre-line";
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadCastorData() {
+  $("refresh-button").disabled = true;
+  message("data-message", "");
+  $("connection-status").textContent = "Connecting to AST services…";
+
+  try {
+    const { data: { session }, error: sessionError } =
+      await supabase.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    if (!session?.access_token) {
+      showDashboard(false);
+      message("login-message", "Please sign in again.", "error");
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke(
+      "castor-usage",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      }
+    );
+
+    if (error) {
+      // Supabase may wrap non-2xx function responses.
+      let detail = error.message || "Function request failed.";
+      try {
+        const response = error.context;
+        if (response && typeof response.json === "function") {
+          const body = await response.json();
+          if (body?.error) detail = body.error;
+        }
+      } catch (_) {}
+      throw new Error(detail);
+    }
+
+    if (!data || !Array.isArray(data.serviceLines)) {
+      throw new Error(
+        "Unexpected API response: serviceLines array not found."
+      );
+    }
+
+    serviceLines = data.serviceLines;
+    $("total").textContent = serviceLines.length;
+    $("active").textContent = serviceLines.filter(
+      line => String(line.status || "").toLowerCase() === "active"
+    ).length;
+    $("updated").textContent = new Date().toLocaleTimeString();
+    $("connection-status").textContent =
+      "Connected to AST services through the secured dashboard function.";
+    message("data-message", "Live service-line data loaded.", "success");
+    renderRows();
+    renderServiceBreakdown();
+    renderUsagePie();
+    updateNotificationStatus();
+  } catch (error) {
+    console.error("AST dashboard error:", error);
+    $("connection-status").textContent = "Unable to load AST usage data.";
+    message(
+      "data-message",
+      `Request failed: ${error.message || "Unknown error"}. Check the function logs if the problem persists.`,
+      "error"
+    );
+  } finally {
+    $("refresh-button").disabled = false;
+  }
+}
+
+async function init() {
+  if (
+    SUPABASE_PUBLISHABLE_KEY === "YOUR_SUPABASE_PUBLISHABLE_KEY" ||
+    !SUPABASE_PUBLISHABLE_KEY
+  ) {
+    message(
+      "login-message",
+      "Setup incomplete: replace YOUR_SUPABASE_PUBLISHABLE_KEY in index.html before signing in.",
+      "error"
+    );
+    return;
+  }
+
+  supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  $("login-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = $("login-button");
+    button.disabled = true;
+    message("login-message", "Signing in…");
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: $("email").value.trim(),
+        password: $("password").value
+      });
+
+      if (error) throw error;
+
+      $("password").value = "";
+      message("login-message", "");
+      showDashboard(true);
+      await loadCastorData();
+    } catch (error) {
+      message(
+        "login-message",
+        error.message || "Sign-in failed.",
+        "error"
+      );
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("refresh-button").addEventListener("click", loadCastorData);
+
+  $("logout-button").addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    serviceLines = [];
+    $("rows").replaceChildren();
+    renderServiceBreakdown();
+    renderUsagePie();
+    updateNotificationStatus();
+    showDashboard(false);
+    message("login-message", "You have signed out.", "success");
+  });
+
+  $("search").addEventListener("input", renderRows);
+  $("service-selector").addEventListener("change", () => selectServiceLine($("service-selector").value));
+  $("show-service-details").addEventListener("click", () => selectServiceLine($("service-selector").value));
+  $("notifications-enabled").addEventListener("change", () => updateNotificationStatus());
+  $("notification-email").addEventListener("input", () => updateNotificationStatus());
+  $("notification-threshold").addEventListener("change", () => updateNotificationStatus());
+  $("save-notification-settings").addEventListener("click", () => {
+    const settings = getNotificationSettings();
+    if (settings.enabled && (!settings.email || !$("notification-email").checkValidity())) {
+      updateNotificationStatus();
+      $("notification-email").focus();
+      return;
+    }
+    try {
+      localStorage.setItem("astUsageNotificationSettings", JSON.stringify(settings));
+      updateNotificationStatus(true);
+    } catch (_) {
+      $("notification-status").textContent = "Unable to save settings in this browser. No email has been sent.";
+    }
+  });
+
+  loadNotificationSettings();
+  renderUsagePie();
+  renderServiceBreakdown();
+  updateNotificationStatus();
+
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    message("login-message", error.message, "error");
+    return;
+  }
+
+  if (data.session) {
+    showDashboard(true);
+    await loadCastorData();
+  } else {
+    showDashboard(false);
+  }
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT" || !session) {
+      showDashboard(false);
+    }
+  });
+}
+
+init();
+</script>
+</body>
+</html>
