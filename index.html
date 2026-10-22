@@ -67,6 +67,22 @@
     }
     th { color: #617586; font-size: 11px; text-transform: uppercase; }
     .hidden { display: none !important; }
+    .chart-grid { display:grid; grid-template-columns:minmax(180px,240px) 1fr; gap:24px; align-items:center; }
+    .pie-chart { width:min(220px,100%); aspect-ratio:1; border-radius:50%; margin:auto; position:relative; background:conic-gradient(#18815f 0deg 0deg,#dbe4ea 0deg 360deg); }
+    .pie-chart::after { content:""; position:absolute; inset:25%; background:white; border-radius:50%; }
+    .pie-center { position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+    .pie-center strong { font-size:25px; line-height:1.1; }
+    .pie-center span { color:#617586; font-size:12px; margin-top:4px; }
+    .chart-legend { display:flex; flex-direction:column; gap:14px; font-size:14px; }
+    .legend-row { display:flex; align-items:flex-start; gap:9px; }
+    .legend-dot { width:11px; height:11px; border-radius:3px; flex:none; margin-top:3px; }
+    .legend-row strong { display:block; margin-bottom:3px; }
+    .notification-grid { display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:12px; }
+    .notification-grid label { display:block; font-size:13px; margin-bottom:5px; }
+    .notification-grid input,.notification-grid select { width:100%; min-width:0; }
+    .notice { padding:11px 12px; background:#fff6df; border:1px solid #ead9a8; border-radius:8px; color:#654c12; font-size:12px; line-height:1.5; }
+    .notification-status { font-size:13px; line-height:1.5; margin-top:10px; }
+    @media (max-width:650px) { .chart-grid,.notification-grid { grid-template-columns:1fr; } }
     .badge {
       display: inline-block; border-radius: 20px;
       padding: 5px 8px; background: #e3edf3; font-size: 11px;
@@ -116,6 +132,20 @@
       </div>
     </section>
 
+    <section class="card" aria-label="Allowance usage breakdown">
+      <h2>Allowance usage breakdown</h2>
+      <p class="muted">Aggregate across the service lines currently loaded. Usage combines Standard GB and Priority GB; opt-in priority is shown separately in the table and is not added again.</p>
+      <div class="chart-grid">
+        <div class="pie-chart" id="usage-pie" role="img" aria-label="Pie chart showing allowance used and remaining">
+          <div class="pie-center"><strong id="pie-percent">—</strong><span>allowance used</span></div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-row"><span class="legend-dot" style="background:#18815f"></span><div><strong id="pie-used">— GB used</strong><span class="muted">Standard + priority usage</span></div></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#dbe4ea;border:1px solid #b8c6d0"></span><div><strong id="pie-remaining">— GB remaining</strong><span class="muted">Included allowance minus usage, minimum zero</span></div></div>
+        </div>
+      </div>
+    </section>
+
     <section class="card">
       <h2>Service lines</h2>
       <label for="search">Search by name, nickname or ID</label>
@@ -138,6 +168,31 @@
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section class="card" aria-label="Usage notification settings">
+      <h2>Usage threshold notifications</h2>
+      <p class="muted">Choose a usage threshold and recipient for an alert when a service line reaches that level.</p>
+      <label><input id="notifications-enabled" type="checkbox" style="width:auto;margin-right:7px"> Enable threshold notifications</label>
+      <div class="notification-grid">
+        <div>
+          <label for="notification-email">Recipient email</label>
+          <input id="notification-email" type="email" placeholder="name@company.com" autocomplete="email">
+        </div>
+        <div>
+          <label for="notification-threshold">Notify at</label>
+          <select id="notification-threshold">
+            <option value="50">50%</option><option value="70">70%</option>
+            <option value="80" selected>80%</option><option value="85">85%</option>
+            <option value="90">90%</option><option value="95">95%</option><option value="100">100%</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="save-notification-settings" type="button">Save settings on this browser</button>
+      </div>
+      <div id="notification-status" class="notification-status muted" role="status" aria-live="polite">Notifications are disabled.</div>
+      <div class="notice">Email delivery is not active yet. This page can save the preference in this browser and show threshold matches, but actual email sending requires a server-side Supabase notification function and an email provider. Do not put email-provider API keys in this HTML.</div>
     </section>
   </section>
 </main>
@@ -197,6 +252,75 @@ function latestUsage(line) {
   return [...entries].sort((a, b) =>
     String(b.startDate || "").localeCompare(String(a.startDate || ""))
   )[0];
+}
+
+function latestUsageForAlert(line) {
+  const usage = latestUsage(line);
+  if (!usage) return null;
+  const standard = Number(usage.totalStandardGb) || 0;
+  const priority = Number(usage.totalPriorityGb) || 0;
+  const included = Number(usage.includedGb);
+  if (!Number.isFinite(included) || included <= 0) return null;
+  return { used: Math.max(0, standard + priority), included };
+}
+
+function renderUsagePie() {
+  const totals = serviceLines.reduce((acc, line) => {
+    const item = latestUsageForAlert(line);
+    if (item) {
+      acc.used += item.used;
+      acc.included += item.included;
+    }
+    return acc;
+  }, { used: 0, included: 0 });
+  const remaining = Math.max(0, totals.included - totals.used);
+  const pct = totals.included > 0 ? totals.used / totals.included * 100 : 0;
+  const angle = Math.min(100, pct) * 3.6;
+  $("usage-pie").style.background =
+    `conic-gradient(#18815f 0deg ${angle}deg,#dbe4ea ${angle}deg 360deg)`;
+  $("pie-percent").textContent = totals.included > 0 ? Math.round(pct) + "%" : "—";
+  $("pie-used").textContent = number(totals.used) + " GB used";
+  $("pie-remaining").textContent = number(remaining) + " GB remaining";
+}
+
+function getNotificationSettings() {
+  return {
+    enabled: $("notifications-enabled").checked,
+    email: $("notification-email").value.trim(),
+    threshold: Number($("notification-threshold").value) || 80
+  };
+}
+
+function updateNotificationStatus(saved = false) {
+  const settings = getNotificationSettings();
+  const status = $("notification-status");
+  if (!settings.enabled) {
+    status.textContent = saved
+      ? "Settings saved in this browser. Notifications are currently disabled."
+      : "Notifications are disabled.";
+    return;
+  }
+  if (!settings.email || !$("notification-email").checkValidity()) {
+    status.textContent = "Enter a valid recipient email address. No email has been sent.";
+    return;
+  }
+  const reached = serviceLines.filter(line => {
+    const item = latestUsageForAlert(line);
+    return item && item.used / item.included * 100 >= settings.threshold;
+  });
+  status.textContent = `Preview: ${reached.length} service line(s) are at or above ${settings.threshold}%. Recipient: ${settings.email}. ${saved ? "Settings saved in this browser. " : ""}No email has been sent; server-side delivery still needs to be configured.`;
+}
+
+function loadNotificationSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("astUsageNotificationSettings") || "null");
+    if (!saved) return;
+    $("notifications-enabled").checked = Boolean(saved.enabled);
+    $("notification-email").value = saved.email || "";
+    $("notification-threshold").value = String(saved.threshold || 80);
+  } catch (_) {
+    // Ignore malformed browser-local settings.
+  }
 }
 
 function renderRows() {
@@ -304,6 +428,8 @@ async function loadCastorData() {
       "Connected to Castor through the secured AST function.";
     message("data-message", "Live service-line data loaded.", "success");
     renderRows();
+    renderUsagePie();
+    updateNotificationStatus();
   } catch (error) {
     console.error("Castor dashboard error:", error);
     $("connection-status").textContent = "Unable to load Castor data.";
@@ -367,11 +493,34 @@ async function init() {
     await supabase.auth.signOut();
     serviceLines = [];
     $("rows").replaceChildren();
+    renderUsagePie();
+    updateNotificationStatus();
     showDashboard(false);
     message("login-message", "You have signed out.", "success");
   });
 
   $("search").addEventListener("input", renderRows);
+  $("notifications-enabled").addEventListener("change", () => updateNotificationStatus());
+  $("notification-email").addEventListener("input", () => updateNotificationStatus());
+  $("notification-threshold").addEventListener("change", () => updateNotificationStatus());
+  $("save-notification-settings").addEventListener("click", () => {
+    const settings = getNotificationSettings();
+    if (settings.enabled && (!settings.email || !$("notification-email").checkValidity())) {
+      updateNotificationStatus();
+      $("notification-email").focus();
+      return;
+    }
+    try {
+      localStorage.setItem("astUsageNotificationSettings", JSON.stringify(settings));
+      updateNotificationStatus(true);
+    } catch (_) {
+      $("notification-status").textContent = "Unable to save settings in this browser. No email has been sent.";
+    }
+  });
+
+  loadNotificationSettings();
+  renderUsagePie();
+  updateNotificationStatus();
 
   const { data, error } = await supabase.auth.getSession();
   if (error) {
