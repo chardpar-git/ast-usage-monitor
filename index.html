@@ -9,10 +9,10 @@
     * { box-sizing: border-box; }
     :root { --navy:#101f39; --navy-2:#1b3150; --ocean:#087e8b; --teal:#16a6a1; --page:#eef3f7; --surface:#fff; --ink:#17283e; --muted:#63748a; --line:#d8e2ec; }
     body { margin:0; font-family:Inter,"Segoe UI",Arial,sans-serif; background:var(--page); color:var(--ink); }
-    header { position:relative; overflow:hidden; color:white; padding:22px max(20px,calc((100% - 1200px)/2)); background:linear-gradient(115deg,#0e1b31 0%,#173552 58%,#0d5667 100%); border-bottom:3px solid var(--teal); }
+    header { position:relative; overflow:hidden; color:white; padding:28px max(20px,calc((100% - 1280px)/2)); background:radial-gradient(ellipse at 82% 5%,rgba(32,197,181,.20),transparent 34%),linear-gradient(115deg,#07162c 0%,#123451 54%,#087080 100%); border-bottom:3px solid var(--teal); }
     header::after { content:""; position:absolute; width:340px; height:340px; right:-95px; top:-190px; border:1px solid rgba(255,255,255,.11); border-radius:50%; box-shadow:0 0 0 28px rgba(255,255,255,.025),0 0 0 58px rgba(255,255,255,.025); pointer-events:none; }
     .brand-row { display:flex; align-items:center; gap:24px; position:relative; z-index:1; }
-    .brand-logo-plate { display:flex; align-items:center; justify-content:center; flex:none; width:320px; min-height:82px; padding:12px 18px; border-radius:10px; background:#fff; box-shadow:0 5px 18px rgba(0,0,0,.14); }
+    .brand-logo-plate { display:flex; align-items:center; justify-content:center; flex:none; width:340px; min-height:88px; padding:12px 18px; border-radius:10px; background:#fff; box-shadow:0 5px 18px rgba(0,0,0,.14); }
     .brand-logo { display:block; width:100%; max-width:100%; max-height:58px; height:auto; object-fit:contain; object-position:center; }
     .brand-divider { width:1px; height:48px; background:rgba(255,255,255,.28); }
     .brand-title h1 { margin:0 0 6px; font-size:clamp(22px,3vw,30px); letter-spacing:-.5px; }
@@ -70,7 +70,17 @@
     .notice { padding:11px 12px; background:#fff6df; border:1px solid #ead9a8; border-radius:8px; color:#654c12; font-size:12px; line-height:1.5; }
     .notification-status { font-size:13px; line-height:1.5; margin-top:10px; }
     .service-breakdown-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:14px; }
-    .service-breakdown-item { border:1px solid #dce6ee; border-radius:10px; padding:14px; min-width:0; }
+    .service-breakdown-item { border:1px solid #dce6ee; border-radius:10px; padding:14px; min-width:0; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+    .service-breakdown-item:hover { border-color:var(--ocean); box-shadow:0 5px 18px rgba(8,126,139,.12); }
+    .service-breakdown-item.selected { border:2px solid var(--ocean); background:#f0fbfb; }
+    .detail-toolbar { display:flex; gap:14px; align-items:end; flex-wrap:wrap; }
+    .detail-toolbar > div { flex:1; min-width:240px; }
+    .detail-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:14px 0; }
+    .detail-stat { background:#f2f7fa; border:1px solid #dce7ef; padding:14px; border-radius:10px; }
+    .detail-stat span { display:block; color:var(--muted); font-size:12px; }
+    .detail-stat strong { display:block; margin-top:6px; font-size:18px; overflow-wrap:anywhere; }
+    .history-heading { margin-top:20px; }
+    @media(max-width:760px) { .detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     .service-breakdown-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
     .service-breakdown-head strong { display:block; font-size:14px; }
     .service-breakdown-pie { width:76px; height:76px; border-radius:50%; position:relative; flex:none; }
@@ -185,6 +195,12 @@
     <section class="card" aria-label="Per-service-line usage breakdown">
       <h2>Usage breakdown per service line</h2>
       <p class="muted">Each card shows Standard, Priority and Opt-in Priority separately. Allowance usage is Standard + Priority; Opt-in Priority is displayed separately to avoid double-counting.</p>
+      <div class="detail-toolbar">
+        <div><label for="service-selector">Select a service line to view details</label><select id="service-selector"><option value="">Load data to choose a service line</option></select></div>
+        <button type="button" id="show-service-details" class="secondary">View selected service</button>
+      </div>
+      <div id="selected-service-details"><p class="muted">Select a service line above, or click a service-line card below, to view its usage and monthly history.</p></div>
+      <h3 style="margin:24px 0 4px">All service lines</h3>
       <div id="service-breakdown" class="service-breakdown-grid">
         <p class="muted">Sign in and refresh to load service-line usage.</p>
       </div>
@@ -334,7 +350,7 @@ function renderServiceBreakdown() {
       ? `${safeDate(usage.startDate)} – ${safeDate(usage.endDate)}`
       : "No usage record";
 
-    return `<article class="service-breakdown-item">
+    return `<article class="service-breakdown-item" data-service-id="${escapeHtml(String(line.id ?? line.name ?? ""))}" tabindex="0" role="button" aria-label="View details for ${serviceName}">
       <div class="service-breakdown-head">
         <div>
           <strong>${serviceName}</strong>
@@ -357,6 +373,41 @@ function renderServiceBreakdown() {
       </div>
     </article>`;
   }).join("");
+  container.querySelectorAll(".service-breakdown-item").forEach(card => {
+    const choose = () => selectServiceLine(card.dataset.serviceId);
+    card.addEventListener("click", choose);
+    card.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); choose(); } });
+  });
+  const selector = $("service-selector");
+  const previous = selector.value;
+  selector.innerHTML = '<option value="">Choose a service line…</option>' + serviceLines.map(line => {
+    const id = String(line.id ?? line.name ?? "");
+    const title = [line.name || "Unnamed service", line.nickname].filter(Boolean).join(" — ");
+    return `<option value="${escapeHtml(id)}">${escapeHtml(title)}</option>`;
+  }).join("");
+  if (serviceLines.some(line => String(line.id ?? line.name ?? "") === previous)) selector.value = previous;
+  else if (serviceLines.length) selector.value = String(serviceLines[0].id ?? serviceLines[0].name ?? "");
+  if (selector.value) selectServiceLine(selector.value);
+}
+
+function selectServiceLine(id) {
+  const line = serviceLines.find(item => String(item.id ?? item.name ?? "") === String(id));
+  if (!line) return;
+  const selector = $("service-selector");
+  if (selector.value !== String(id)) selector.value = String(id);
+  document.querySelectorAll(".service-breakdown-item").forEach(card => card.classList.toggle("selected", card.dataset.serviceId === String(id)));
+  const usage = latestUsage(line);
+  const standard = Number(usage?.totalStandardGb) || 0;
+  const priority = Number(usage?.totalPriorityGb) || 0;
+  const optin = Number(usage?.totalOptInPriorityGb) || 0;
+  const allowance = Number(usage?.includedGb) || 0;
+  const total = standard + priority;
+  const remaining = Math.max(0, allowance - total);
+  const overage = Math.max(0, total - allowance);
+  const pct = allowance > 0 ? total / allowance * 100 : null;
+  const history = [...(Array.isArray(line.monthlyUsage) ? line.monthlyUsage : [])].sort((a,b) => String(b.startDate || "").localeCompare(String(a.startDate || "")));
+  const historyRows = history.map(item => `<tr><td>${escapeHtml(safeDate(item.startDate))} – ${escapeHtml(safeDate(item.endDate))}</td><td>${number(item.totalStandardGb)}</td><td>${number(item.totalPriorityGb)}</td><td>${number(item.totalOptInPriorityGb)}</td><td>${number((Number(item.totalStandardGb)||0)+(Number(item.totalPriorityGb)||0))}</td><td>${number(item.includedGb)}</td></tr>`).join("");
+  $("selected-service-details").innerHTML = `<h3 style="margin:20px 0 4px">${escapeHtml(line.name || "Unnamed service")}</h3><p class="muted">${escapeHtml(line.nickname || "")} ${line.id ? "· ID: " + escapeHtml(line.id) : ""} · Status: ${escapeHtml(line.status || "Unknown")}</p><div class="detail-grid"><div class="detail-stat"><span>Standard usage</span><strong>${number(standard)} GB</strong></div><div class="detail-stat"><span>Priority usage</span><strong>${number(priority)} GB</strong></div><div class="detail-stat"><span>Opt-in Priority</span><strong>${number(optin)} GB</strong></div><div class="detail-stat"><span>Total counted</span><strong>${number(total)} GB</strong></div><div class="detail-stat"><span>Included allowance</span><strong>${number(allowance)} GB</strong></div><div class="detail-stat"><span>Remaining</span><strong>${number(remaining)} GB</strong></div><div class="detail-stat"><span>Over allowance</span><strong style="color:${overage > 0 ? "#b42318" : "inherit"}">${number(overage)} GB</strong></div><div class="detail-stat"><span>Allowance used</span><strong style="color:${pct !== null && pct >= 100 ? "#b42318" : "inherit"}">${pct === null ? "—" : number(pct) + "%"}</strong></div></div><h3 class="history-heading">Usage history by period</h3><div class="table-wrap"><table><thead><tr><th>Usage period</th><th>Standard GB</th><th>Priority GB</th><th>Opt-in Priority GB</th><th>Total counted GB</th><th>Included GB</th></tr></thead><tbody>${historyRows || '<tr><td colspan="6">No usage history available.</td></tr>'}</tbody></table></div>`;
 }
 
 function escapeHtml(value) {
@@ -584,6 +635,8 @@ async function init() {
   });
 
   $("search").addEventListener("input", renderRows);
+  $("service-selector").addEventListener("change", () => selectServiceLine($("service-selector").value));
+  $("show-service-details").addEventListener("click", () => selectServiceLine($("service-selector").value));
   $("notifications-enabled").addEventListener("change", () => updateNotificationStatus());
   $("notification-email").addEventListener("input", () => updateNotificationStatus());
   $("notification-threshold").addEventListener("change", () => updateNotificationStatus());
