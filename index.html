@@ -82,7 +82,17 @@
     .notification-grid input,.notification-grid select { width:100%; min-width:0; }
     .notice { padding:11px 12px; background:#fff6df; border:1px solid #ead9a8; border-radius:8px; color:#654c12; font-size:12px; line-height:1.5; }
     .notification-status { font-size:13px; line-height:1.5; margin-top:10px; }
-    @media (max-width:650px) { .chart-grid,.notification-grid { grid-template-columns:1fr; } }
+    .service-breakdown-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:14px; }
+    .service-breakdown-item { border:1px solid #dbe4ea; border-radius:10px; padding:14px; min-width:0; }
+    .service-breakdown-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+    .service-breakdown-head strong { display:block; font-size:14px; }
+    .service-breakdown-pie { width:76px; height:76px; border-radius:50%; position:relative; flex:none; }
+    .service-breakdown-pie::after { content:""; position:absolute; inset:23%; background:white; border-radius:50%; }
+    .service-breakdown-pct { position:absolute; z-index:1; inset:0; display:grid; place-items:center; font-size:12px; font-weight:750; }
+    .service-breakdown-metrics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .service-breakdown-metric { font-size:11px; color:#617586; }
+    .service-breakdown-metric strong { display:block; color:#172b3a; font-size:14px; margin-top:3px; overflow-wrap:anywhere; }
+    @media (max-width:650px) { .chart-grid,.notification-grid,.service-breakdown-grid { grid-template-columns:1fr; } }
     .badge {
       display: inline-block; border-radius: 20px;
       padding: 5px 8px; background: #e3edf3; font-size: 11px;
@@ -167,6 +177,14 @@
             <tr><td colspan="7">Sign in and refresh to load data.</td></tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Per-service-line usage breakdown">
+      <h2>Usage breakdown per service line</h2>
+      <p class="muted">Each card shows Standard, Priority and Opt-in Priority separately. Allowance usage is Standard + Priority; Opt-in Priority is displayed separately to avoid double-counting.</p>
+      <div id="service-breakdown" class="service-breakdown-grid">
+        <p class="muted">Sign in and refresh to load service-line usage.</p>
       </div>
     </section>
 
@@ -281,6 +299,68 @@ function renderUsagePie() {
   $("pie-percent").textContent = totals.included > 0 ? Math.round(pct) + "%" : "—";
   $("pie-used").textContent = number(totals.used) + " GB used";
   $("pie-remaining").textContent = number(remaining) + " GB remaining";
+}
+
+function renderServiceBreakdown() {
+  const container = $("service-breakdown");
+  if (!serviceLines.length) {
+    container.innerHTML = '<p class="muted">No service-line data loaded yet.</p>';
+    return;
+  }
+
+  container.innerHTML = serviceLines.map(line => {
+    const usage = latestUsage(line);
+    const standard = Math.max(0, Number(usage?.totalStandardGb) || 0);
+    const priority = Math.max(0, Number(usage?.totalPriorityGb) || 0);
+    const optInPriority = Math.max(0, Number(usage?.totalOptInPriorityGb) || 0);
+    const includedValue = Number(usage?.includedGb);
+    const hasAllowance = Number.isFinite(includedValue) && includedValue > 0;
+    const included = hasAllowance ? includedValue : 0;
+    const used = standard + priority;
+    const remaining = Math.max(0, included - used);
+    const overage = Math.max(0, used - included);
+    const pct = hasAllowance ? used / included * 100 : null;
+    const shownPct = pct === null ? "—" : Math.round(pct) + "%";
+    const angle = pct === null ? 0 : Math.min(100, pct) * 3.6;
+    const pie = pct === null
+      ? "conic-gradient(#dbe4ea 0deg 360deg)"
+      : `conic-gradient(#18815f 0deg ${angle}deg,#dbe4ea ${angle}deg 360deg)`;
+    const serviceName = escapeHtml(line.name || "Unnamed service");
+    const nickname = escapeHtml(line.nickname || "");
+    const serviceId = escapeHtml(line.id ?? "—");
+    const period = usage
+      ? `${safeDate(usage.startDate)} – ${safeDate(usage.endDate)}`
+      : "No usage record";
+
+    return `<article class="service-breakdown-item">
+      <div class="service-breakdown-head">
+        <div>
+          <strong>${serviceName}</strong>
+          ${nickname ? `<div class="muted">${nickname}</div>` : ""}
+          <div class="muted">ID: ${serviceId}</div>
+          <div class="muted" style="margin-top:5px">${escapeHtml(period)}</div>
+        </div>
+        <div class="service-breakdown-pie" style="background:${pie}" role="img" aria-label="${serviceName}: ${shownPct} of allowance used">
+          <span class="service-breakdown-pct">${shownPct}</span>
+        </div>
+      </div>
+      <div class="service-breakdown-metrics">
+        <div class="service-breakdown-metric">Standard<strong>${number(usage?.totalStandardGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Priority<strong>${number(usage?.totalPriorityGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Opt-in Priority<strong>${number(usage?.totalOptInPriorityGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Total counted<strong>${number(used)} GB</strong></div>
+        <div class="service-breakdown-metric">Included allowance<strong>${number(usage?.includedGb)} GB</strong></div>
+        <div class="service-breakdown-metric">Remaining<strong>${number(remaining)} GB</strong></div>
+        <div class="service-breakdown-metric">Over allowance<strong>${number(overage)} GB</strong></div>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
 }
 
 function getNotificationSettings() {
@@ -428,6 +508,7 @@ async function loadCastorData() {
       "Connected to Castor through the secured AST function.";
     message("data-message", "Live service-line data loaded.", "success");
     renderRows();
+    renderServiceBreakdown();
     renderUsagePie();
     updateNotificationStatus();
   } catch (error) {
@@ -493,6 +574,7 @@ async function init() {
     await supabase.auth.signOut();
     serviceLines = [];
     $("rows").replaceChildren();
+    renderServiceBreakdown();
     renderUsagePie();
     updateNotificationStatus();
     showDashboard(false);
@@ -520,6 +602,7 @@ async function init() {
 
   loadNotificationSettings();
   renderUsagePie();
+  renderServiceBreakdown();
   updateNotificationStatus();
 
   const { data, error } = await supabase.auth.getSession();
