@@ -1,14 +1,187 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AST Usage Monitor</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f5f8;
+      color: #193247;
+    }
+    header {
+      background: #173c56;
+      color: white;
+      padding: 24px;
+    }
+    header p { color: #d5e4ed; margin-bottom: 0; }
+    main { max-width: 1100px; margin: auto; padding: 24px; }
+    .notice {
+      background: #fff4d9;
+      border: 1px solid #ead49b;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .card {
+      background: white;
+      border: 1px solid #dce5eb;
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 0;
+    }
+    .label { color: #647989; font-size: 13px; }
+    .value { font-size: 28px; font-weight: bold; margin-top: 10px; }
+    .toolbar { display: flex; gap: 10px; margin: 18px 0; }
+    input, button {
+      padding: 11px;
+      border-radius: 7px;
+      border: 1px solid #cbd7df;
+      font: inherit;
+    }
+    input { flex: 1; min-width: 0; }
+    button {
+      background: #173c56;
+      color: white;
+      cursor: pointer;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 580px; }
+    th, td {
+      padding: 13px 10px;
+      border-bottom: 1px solid #e2e9ee;
+      text-align: left;
+      font-size: 13px;
+    }
+    th { color: #647989; }
+    .status { font-weight: bold; }
+    footer { padding: 22px 0; color: #647989; font-size: 12px; }
+    @media (max-width: 650px) {
+      main { padding: 14px; }
+      .cards { grid-template-columns: 1fr; }
+      .toolbar { flex-direction: column; }
+    }
+  </style>
 </head>
 <body>
-  <h1>AST Usage Monitor</h1>
-  <p>Dashboard setup in progress.</p>
-  <p>Castor API connection will be configured securely through Supabase.</p>
+  <header>
+    <h1>AST Usage Monitor</h1>
+    <p>CASTOR MARINE · SERVICE LINE USAGE</p>
+  </header>
+
+  <main>
+    <div class="notice">
+      <strong>Preview mode — not connected to Castor.</strong><br>
+      The figures below are illustrative only. Live customer data will
+      be loaded after secure Supabase authentication is configured.
+    </div>
+
+    <section class="cards">
+      <div class="card">
+        <div class="label">Service lines</div>
+        <div class="value" id="total">3</div>
+      </div>
+      <div class="card">
+        <div class="label">Warning or critical</div>
+        <div class="value" id="alerts">2</div>
+      </div>
+      <div class="card">
+        <div class="label">API connection</div>
+        <div class="value" style="font-size:19px">Not connected</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Service lines</h2>
+      <div class="toolbar">
+        <input id="search" type="search"
+          placeholder="Search service name or ID">
+        <button id="reset">Reset search</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service line</th>
+              <th>Status</th>
+              <th>Usage</th>
+              <th>Allowance</th>
+              <th>Used</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      AST Usage Monitor · Preview only · No customer alerts are sent
+    </footer>
+  </main>
+
+  <script>
+    const samples = [
+      { id: "DEMO-001", name: "Ocean Pioneer",
+        status: "Active", used: 84, allowance: 100 },
+      { id: "DEMO-002", name: "Sea Explorer",
+        status: "Active", used: 465, allowance: 500 },
+      { id: "DEMO-003", name: "Pacific Star",
+        status: "Active", used: 92, allowance: 200 }
+    ];
+
+    function render() {
+      const query = document.getElementById("search")
+        .value.trim().toLowerCase();
+
+      const filtered = samples.filter(s =>
+        (s.name + " " + s.id).toLowerCase().includes(query)
+      );
+
+      document.getElementById("rows").innerHTML = filtered.map(s => {
+        const pct = s.allowance > 0
+          ? s.used / s.allowance * 100 : 0;
+
+        const status = pct >= 100 ? "Limit reached"
+          : pct >= 90 ? "Critical"
+          : pct >= 80 ? "Warning" : "Normal";
+
+        return `<tr>
+          <td>${s.name}<br><small>${s.id}</small></td>
+          <td>${s.status}</td>
+          <td>${s.used} GB</td>
+          <td>${s.allowance} GB</td>
+          <td><span class="status">${Math.round(pct)}% · ${status}</span></td>
+        </tr>`;
+      }).join("");
+
+      document.getElementById("total").textContent = samples.length;
+      document.getElementById("alerts").textContent =
+        samples.filter(s => s.used / s.allowance * 100 >= 80).length;
+
+      if (!filtered.length) {
+        document.getElementById("rows").innerHTML =
+          '<tr><td colspan="5">No matching service lines.</td></tr>';
+      }
+    }
+
+    document.getElementById("search").addEventListener("input", render);
+    document.getElementById("reset").addEventListener("click", () => {
+      document.getElementById("search").value = "";
+      render();
+    });
+
+    render();
+  </script>
 </body>
 </html>
